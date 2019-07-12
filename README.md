@@ -64,4 +64,4 @@ DDPG的优点以及特点，在若干blog，如[Patric Emami](https://pemami4911
 4. Blogpost by Ben Lau, [Using Keras and Deep Deterministic Policy Gradient to play TORCS](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html)
 5. rl-keras, [Deep Reinforcement Learning for Keras](https://github.com/keras-rl/keras-rl)
 
-*其中1,3采用Tensorflow编写，2采用PyTorch，4,5采用Keras(Tensorflow backend)编写。*
+其中1,3采用 Tensorflow 编写，2采用 PyTorch，4,5采用 Keras(Tensorflow backend) 编写。

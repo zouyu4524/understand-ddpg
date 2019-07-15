@@ -34,7 +34,7 @@ DDPG的优点以及特点, 在若干blog, 如[Patric Emami](https://pemami4911.g
 
 此前套用Ben Lau[博客](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html)中的代码, 实现了基于DDPG的FL training market中动态博弈问题求解的程序, 但是结果非常不理想。粗略来看, 各个player的决策结果完全由OU过程决定（后来发现, 应该是OU过程中没有对噪声项乘以$\Delta_t$的原因）。  
 随后打算用Matlab重写一遍代码, 以便调试。前期工作进展比较顺利, 以Matlab的Deep learning toolbox为基础完成了基本环境的搭建, 其中由于Deep learning toolbox目前还处于完善阶段(R2019a), 有若干类型的Layer仍然没有被官方收录, 例如支持多输入流的输入层, `sigmoid activation`等。为此, 基于Matlab文档提供的思路实现了相应的需求。  
-但天不遂人愿阿, 当需要实现DDPG中的核心步骤, 即**network的更新**时, 发现需要使用对神经网络求梯度(`autograd`)的步骤, 而截至目前, 该功能还未由Deep learning toolbox提供。论坛查询发现, 开发者[正在开发中](https://www.mathworks.com/matlabcentral/answers/453394-does-matlab-r2019a-support-automatic-differentiation-in-deep-learning-toolbox-or-otherwise#answer_370289), 计划于下一个版本中引入。但是下一个版本的推出时间将是今年的九月份, 等不起阿。那么我有两种思路, 第一: 自己尝试实现对深度神经网络求梯度；第二: 放弃Matlab方案。简单查询了一些资料发现基于Matlab有若干已开发的`autograd`的程序, 但是年度均有些久远, 不确定能否拿来直接用（持怀疑态度）, 在扎进去研究之前, 我试着先明确一下DDPG中究竟是如何使用`autograd`？无论如何, 理解这一细节对于掌握DDPG或者自己用Matlab实现DDPG均是绕不开的一环了。综合来看, 目前放弃Matlab的实现方案转而回头继续写Python看来是唯一的途径了。等将来Matlab完善了Deep learning toolbox后再考虑拾起遗留的进度。  
+但天不遂人愿阿, 当需要实现DDPG中的核心步骤, 即**network的更新**时, 发现需要使用对神经网络求梯度(`autograd`)的步骤, 而截至目前, 该功能还未由Deep learning toolbox提供。论坛查询发现, 开发者[正在开发中](https://www.mathworks.com/matlabcentral/answers/453394-does-matlab-r2019a-support-automatic-differentiation-in-deep-learning-toolbox-or-otherwise#answer_370289), 计划于下一个版本中引入。但是下一个版本的推出时间将是今年的九月份, 等不起阿。那么我有两种思路, 第一: 自己尝试实现对深度神经网络求梯度；第二: 放弃Matlab方案。简单查询了一些资料发现基于Matlab有若干已开发的`autograd`的程序, 但是年代均有些久远, 不确定能否拿来直接用（持怀疑态度）, 在扎进去研究之前, 我试着先明确一下DDPG中究竟是如何使用`autograd`？无论如何, 理解这一细节对于掌握DDPG或者自己用Matlab实现DDPG均是绕不开的一环了。综合来看, 目前放弃Matlab的实现方案转而回头继续写Python看来是唯一的途径了。等将来Matlab完善了Deep learning toolbox后再考虑拾起遗留的进度。  
 那么, 接下来, 首要的任务就是彻底搞清楚DDPG中actor与critic更新网络的环节。
 
 ## DDPG网络更新关键
@@ -69,29 +69,29 @@ $$
 
 ### Actor network更新
 
-另一方面, actor network目的在于选择出最佳的action, 因此该网络的更新方向是**最大化**Q值的方向。 其梯度表示如下: 
+另一方面, actor network目的在于选择出最佳的action, 因此该网络的更新方向是**最大化**Q值的方向。其梯度表示如下: 
 
 $$
 \nabla_{\theta^{\mu}} J \approx \frac{1}{N} \sum_{i} \underbrace{\nabla_a Q(s, a|\theta^Q)|_ {s=s_i, a=\mu(s_i)}}_ {\partial Q / \partial \mu} \underbrace{\nabla_{\theta^{\mu}} \mu(s|\theta^{\mu})|_ {s_i}}_ {\partial \mu / \partial \theta^{\mu}},
 $$  
 
 其依据是求导的链式法则, Q值对actor network的梯度表示为$\frac{\partial Q}{\partial \theta^{\mu}}$, 通过链式法则表示如上。  
-**具体如何用程序语言表示actor network的更新方式正是我的疑惑之所在。** 下一节将罗列目前已经查询到的五种DDPG实现方式中更新actor以及critic网络的步骤, 从而对比理解DDPG中的关键点。
+**具体如何用程序语言表示actor network的更新方式正是我的疑惑之所在。** 下一节将罗列目前已经查询到的四种DDPG实现方式中更新actor以及critic网络的步骤, 从而对比理解DDPG中的关键点。
 
 ## DDPG实现方式对比
 
-目前已经查阅的DDPG实现文章/代码有如下五种: 
+目前已经查阅的DDPG实现文章/代码有如下四种: 
 
 1. Blogpost by Chris Yoon, [Deep Deterministic Policy Gradients Explained](https://towardsdatascience.com/deep-deterministic-policy-gradients-explained-2d94655a9b7b)
 2. Blogpost by Patric Emami, [Deep deterministic policy gradients in tensorflow](https://pemami4911.github.io/blog/2016/08/21/ddpg-rl.html)
 3. Blogpost by Ben Lau, [Using Keras and Deep Deterministic Policy Gradient to play TORCS](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html)
 4. rl-keras, [Deep Reinforcement Learning for Keras](https://github.com/keras-rl/keras-rl)
 
-其中2采用 Tensorflow 编写, 1采用 PyTorch, 3,4采用 Keras(Tensorflow backend) 编写。
+其中1采用 PyTorch, 2采用 Tensorflow 编写, 3,4采用 Keras(Tensorflow backend) 编写。
 
 ### Deep deterministic policy gradients in tensorflow
 
-在这篇博客中，通过朝 $Q$ 的*梯度*更新最大化 $Q$ 值, 该*梯度*表示为 $-\nabla_{\theta^{\mu}} Q$, 根据链式法则等效为 $-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$, 该梯度是$Q$值相对于actor network的梯度, 而actor network的目的在于最大化该值, 因此在网络更新时, 其loss函数等效为$-Q$。 具体而言, 代码中更新体现如下: 
+在这篇博客中，通过朝 $Q$ 的**梯度**方向更新最大化 $Q$ 值, 该**梯度**表示为 $-\nabla_{\theta^{\mu}} Q$, 根据链式法则等效为 $-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$, 该梯度是$Q$值相对于actor network参数的梯度, 而actor network的目的在于最大化该值, 因此在网络更新时, 其loss函数等效为$-Q$。具体而言, 代码中更新体现如下: 
 
 ```
 # This gradient will be provided by the critic network
@@ -109,8 +109,8 @@ self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
     apply_gradients(zip(self.actor_gradients, self.network_params))
 ```
 
-值得注意的是其中对`tf.gradients`函数的使用, 是actor networkd更新操作的精髓所在。`tf.gradients`接收参数的前三个位置分别是`ys`, `xs`和`ys_grad`, 其含义分别是$\frac{\partial y}{\partial x}$中的分母和分子以及对`y`的前序求导, 也可以理解为相应的权重；其中的关键就在于第三个参数, 是实现以上链式法则的关键。具体而言, 第三个参数填入了`-self.action_gradient`, 而`self.action_gradient`是一个`placeholder`, 是为$\nabla_a Q$的预留位，因此该行代码整体实现了$-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$。  
-此外，该步仅实现了梯度的符号化计算，并为实际应用梯度更新，梯度的更新操作是通过接下来的代码实现，即`apply_gradients`。
+值得注意的是其中对`tf.gradients`函数的使用, 是actor networkd更新操作的精髓所在。`tf.gradients`接收参数的前三个位置分别是`ys`, `xs`和`ys_grad`, 其含义分别是$\frac{\partial y}{\partial x}$中的分子和分母以及对`y`的前序求导, 也可以理解为相应的权重；其中第三个参数, 是实现以上链式法则的关键。具体而言, 第三个参数填入了`-self.action_gradient`, 而`self.action_gradient`是一个`placeholder`, 是为$\nabla_a Q$的预留位，因此该行代码整体实现了$-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$。  
+此外，该步仅实现了梯度的符号化计算，并未实际应用梯度更新，梯度的更新操作是通过接下来的代码实现，即`apply_gradients`。
 
 ### Using Keras and Deep Deterministic Policy Gradient to play TORCS
 
@@ -156,7 +156,7 @@ action_values = self.actor_train_fn(inputs)[0]
 
 以上代码相对分散的放置以及层层封装导致可读性较差, 但是整体思路与PyTorch中并无二致。同样的`updates`实现了$-Q(s, \mu(s|\theta^{\mu}))$对actor network参数的梯度符号化运算, 通过`K.function`执行相应的梯度运算。
 
-值得注意的是该repo中对OU过程的实现中$\sigma$逐步递减的设计可以参考。
+值得注意的是该repo中对OU过程的实现中$\sigma$逐步递减的设计可以参考，其目的在于逐步降低Exploration的概率。  
 
 ### 小结
 

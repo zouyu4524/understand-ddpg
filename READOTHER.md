@@ -2,6 +2,8 @@
 
 本文记录学习DDPG算法细节中遇到的若干问题。
 
+<details>
+<summary>Click to open TOC</summary>
 <!-- MarkdownTOC autolink="true" autoanchor="true" -->
 
 - [DDPG的主要特征](#ddpg%E7%9A%84%E4%B8%BB%E8%A6%81%E7%89%B9%E5%BE%81)
@@ -22,7 +24,7 @@
 - [参考](#%E5%8F%82%E8%80%83)
 
 <!-- /MarkdownTOC -->
-
+</details>
 
 <a id="ddpg%E7%9A%84%E4%B8%BB%E8%A6%81%E7%89%B9%E5%BE%81"></a>
 ## DDPG的主要特征

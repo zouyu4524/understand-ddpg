@@ -2,24 +2,29 @@
 
 本文记录学习DDPG算法细节中遇到的若干问题。
 
-- [Deep deterministic policy gradients (DDPG)](#deep-deterministic-policy-gradients--ddpg-)
-  * [DDPG的主要特征](#ddpg-----)
-  * [我的困惑](#----)
-  * [DDPG网络更新关键](#ddpg------)
-    + [符号说明](#----)
-    + [Critic network更新](#critic-network--)
-    + [Actor network更新](#actor-network--)
-  * [DDPG实现方式对比](#ddpg------)
-    + [Deep deterministic policy gradients in tensorflow](#deep-deterministic-policy-gradients-in-tensorflow)
-    + [Using Keras and Deep Deterministic Policy Gradient to play TORCS](#using-keras-and-deep-deterministic-policy-gradient-to-play-torcs)
-    + [Deep Deterministic Policy Gradients Explained](#deep-deterministic-policy-gradients-explained)
-    + [Deep Reinforcement Learning for Keras](#deep-reinforcement-learning-for-keras)
-    + [小结](#--)
-  * [其他可能影响DDPG效果的因素](#------ddpg-----)
-    + [Noise 添加方式](#noise-----)
-    + [Nomalization](#nomalization)
-  * [参考](#--)
+<!-- MarkdownTOC autolink="true" autoanchor="true" -->
 
+- [DDPG的主要特征](#ddpg%E7%9A%84%E4%B8%BB%E8%A6%81%E7%89%B9%E5%BE%81)
+- [我的困惑](#%E6%88%91%E7%9A%84%E5%9B%B0%E6%83%91)
+- [DDPG网络更新关键](#ddpg%E7%BD%91%E7%BB%9C%E6%9B%B4%E6%96%B0%E5%85%B3%E9%94%AE)
+	- [符号说明](#%E7%AC%A6%E5%8F%B7%E8%AF%B4%E6%98%8E)
+	- [Critic network更新](#critic-network%E6%9B%B4%E6%96%B0)
+	- [Actor network更新](#actor-network%E6%9B%B4%E6%96%B0)
+- [DDPG实现方式对比](#ddpg%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F%E5%AF%B9%E6%AF%94)
+	- [Deep deterministic policy gradients in tensorflow](#deep-deterministic-policy-gradients-in-tensorflow)
+	- [Using Keras and Deep Deterministic Policy Gradient to play TORCS](#using-keras-and-deep-deterministic-policy-gradient-to-play-torcs)
+	- [Deep Deterministic Policy Gradients Explained](#deep-deterministic-policy-gradients-explained)
+	- [Deep Reinforcement Learning for Keras](#deep-reinforcement-learning-for-keras)
+	- [小结](#%E5%B0%8F%E7%BB%93)
+- [其他可能影响DDPG效果的因素](#%E5%85%B6%E4%BB%96%E5%8F%AF%E8%83%BD%E5%BD%B1%E5%93%8Dddpg%E6%95%88%E6%9E%9C%E7%9A%84%E5%9B%A0%E7%B4%A0)
+	- [Noise 添加方式](#noise-%E6%B7%BB%E5%8A%A0%E6%96%B9%E5%BC%8F)
+	- [Nomalization](#nomalization)
+- [参考](#%E5%8F%82%E8%80%83)
+
+<!-- /MarkdownTOC -->
+
+
+<a id="ddpg%E7%9A%84%E4%B8%BB%E8%A6%81%E7%89%B9%E5%BE%81"></a>
 ## DDPG的主要特征
 
 DDPG的优点以及特点, 在若干blog, 如[Patric Emami](https://pemami4911.github.io/blog/2016/08/21/ddpg-rl.html)以及[原始论文](https://arxiv.org/pdf/1509.02971.pdf)中已经详述, 在此不再赘述细节。其主要的tricks在于: 
@@ -30,6 +35,7 @@ DDPG的优点以及特点, 在若干blog, 如[Patric Emami](https://pemami4911.g
 4. Exploration via random process, typically OU process, 为actor采取的action基础上增加一定的随机扰动, 以保障一定的探索完整动作空间的几率。一般的, 相应随机扰动的幅度随着训练的深入而逐步递减（方法5中有实现该特性）；
 5. Batch normalization, 为每层神经网络之前加入batch normalization层, 可以降低不对状态量取值范围差异对模型稳定性的影响程度。
 
+<a id="%E6%88%91%E7%9A%84%E5%9B%B0%E6%83%91"></a>
 ## 我的困惑
 
 此前套用Ben Lau[博客](https://yanpanlau.github.io/2016/10/11/Torcs-Keras.html)中的代码, 实现了基于DDPG的FL training market中动态博弈问题求解的程序, 但是结果非常不理想。粗略来看, 各个player的决策结果完全由OU过程决定（后来发现, 应该是OU过程中没有对噪声项乘以$\Delta_t$的原因）。  
@@ -37,10 +43,12 @@ DDPG的优点以及特点, 在若干blog, 如[Patric Emami](https://pemami4911.g
 但天不遂人愿阿, 当需要实现DDPG中的核心步骤, 即**network的更新**时, 发现需要使用对神经网络求梯度(`autograd`)的步骤, 而截至目前, 该功能还未由Deep learning toolbox提供。论坛查询发现, 开发者[正在开发中](https://www.mathworks.com/matlabcentral/answers/453394-does-matlab-r2019a-support-automatic-differentiation-in-deep-learning-toolbox-or-otherwise#answer_370289), 计划于下一个版本中引入。但是下一个版本的推出时间将是今年的九月份, 等不起阿。那么我有两种思路, 第一: 自己尝试实现对深度神经网络求梯度；第二: 放弃Matlab方案。简单查询了一些资料发现基于Matlab有若干已开发的`autograd`的程序, 但是年代均有些久远, 不确定能否拿来直接用（持怀疑态度）, 在扎进去研究之前, 我试着先明确一下DDPG中究竟是如何使用`autograd`？无论如何, 理解这一细节对于掌握DDPG或者自己用Matlab实现DDPG均是绕不开的一环了。综合来看, 目前放弃Matlab的实现方案转而回头继续写Python看来是唯一的途径了。等将来Matlab完善了Deep learning toolbox后再考虑拾起遗留的进度。  
 那么, 接下来, 首要的任务就是彻底搞清楚DDPG中actor与critic更新网络的环节。
 
+<a id="ddpg%E7%BD%91%E7%BB%9C%E6%9B%B4%E6%96%B0%E5%85%B3%E9%94%AE"></a>
 ## DDPG网络更新关键
 
 其中critic网络作用在于估计值函数（Value function, 即Q函数）, 其输入、输出分别为: states与action、Q值。而actor网络的作用在于根据states决定action, 其输入、输出分别为states、action。
 
+<a id="%E7%AC%A6%E5%8F%B7%E8%AF%B4%E6%98%8E"></a>
 ### 符号说明
 
 |符号 | 含义 |
@@ -51,6 +59,7 @@ DDPG的优点以及特点, 在若干blog, 如[Patric Emami](https://pemami4911.g
 | $\theta^{\mu'}$ | target actor network 参数 |
 | $(s_i, a_i, r_i, s_{i+1})$ | Memory pool 中的sample, 四个维度依次表示, 当前时刻的状态, 当前时刻采取的动作, 相应获得的即时reward以及采取动作后的状态 | 
 
+<a id="critic-network%E6%9B%B4%E6%96%B0"></a>
 ### Critic network更新
 
 其目的在于获得尽可能准确的Q函数估计, 因此critic network的loss定义如下: 
@@ -67,6 +76,7 @@ $$
 
 而$Q(s_i, a_i|\theta^Q)$则是当前critic network给出的估计值。因此, critic network的loss函数就定义为估计值与实际值之间的MSE, critic network目的在于**最小化**该loss。
 
+<a id="actor-network%E6%9B%B4%E6%96%B0"></a>
 ### Actor network更新
 
 另一方面, actor network目的在于选择出最佳的action, 因此该网络的更新方向是**最大化**Q值的方向。其梯度表示如下: 
@@ -78,6 +88,7 @@ $$
 其依据是求导的链式法则, Q值对actor network的梯度表示为$\frac{\partial Q}{\partial \theta^{\mu}}$, 通过链式法则表示如上。  
 **具体如何用程序语言表示actor network的更新方式正是我的疑惑之所在。** 下一节将罗列目前已经查询到的四种DDPG实现方式中更新actor以及critic网络的步骤, 从而对比理解DDPG中的关键点。
 
+<a id="ddpg%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F%E5%AF%B9%E6%AF%94"></a>
 ## DDPG实现方式对比
 
 目前已经查阅的DDPG实现文章/代码有如下四种: 
@@ -89,6 +100,7 @@ $$
 
 其中1采用 PyTorch, 2采用 Tensorflow 编写, 3,4采用 Keras(Tensorflow backend) 编写。
 
+<a id="deep-deterministic-policy-gradients-in-tensorflow"></a>
 ### Deep deterministic policy gradients in tensorflow
 
 在这篇博客中，通过朝 $Q$ 的**梯度**方向更新最大化 $Q$ 值, 该**梯度**表示为 $-\nabla_{\theta^{\mu}} Q$, 根据链式法则等效为 $-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$, 该梯度是$Q$值相对于actor network参数的梯度, 而actor network的目的在于最大化该值, 因此在网络更新时, 其loss函数等效为$-Q$。具体而言, 代码中更新体现如下: 
@@ -112,10 +124,12 @@ self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
 值得注意的是其中对`tf.gradients`函数的使用, 是actor networkd更新操作的精髓所在。`tf.gradients`接收参数的前三个位置分别是`ys`, `xs`和`ys_grad`, 其含义分别是$\frac{\partial y}{\partial x}$中的分子和分母以及对`y`的前序求导, 也可以理解为相应的权重；其中第三个参数, 是实现以上链式法则的关键。具体而言, 第三个参数填入了`-self.action_gradient`, 而`self.action_gradient`是一个`placeholder`, 是为$\nabla_a Q$的预留位，因此该行代码整体实现了$-\nabla_a Q \cdot \nabla_{\theta_{\mu}}\mu(s|\theta_{\mu})$。  
 此外，该步仅实现了梯度的符号化计算，并未实际应用梯度更新，梯度的更新操作是通过接下来的代码实现，即`apply_gradients`。
 
+<a id="using-keras-and-deep-deterministic-policy-gradient-to-play-torcs"></a>
 ### Using Keras and Deep Deterministic Policy Gradient to play TORCS
 
 与[Deep deterministic policy gradients in tensorflow](https://pemami4911.github.io/blog/2016/08/21/ddpg-rl.html)中actor network的更新方式完全一致。
 
+<a id="deep-deterministic-policy-gradients-explained"></a>
 ### Deep Deterministic Policy Gradients Explained
 
 此博客采用PyTorch实现, 其中actor network的更新部分代码如下: 
@@ -138,6 +152,7 @@ self.actor_optimizer  = optim.Adam(self.actor.parameters(), lr=actor_learning_ra
 
 即更新的对象为actor network的参数`actor.parameters()`, 因此以上的梯度更新只发生于actor network。在这一点上, PyTorch相比于Tensorflow更为直观。
 
+<a id="deep-reinforcement-learning-for-keras"></a>
 ### Deep Reinforcement Learning for Keras
 
 该repo中, 是通过Keras实现, 由于其目的是通用的DDPG实现, 因此鲁棒性方面的考虑比较全面, 代码整体稍显“臃肿”, 不过其设计流程有一定的参考性。其中actor network的更新部分的核心代码如下: 
@@ -158,21 +173,26 @@ action_values = self.actor_train_fn(inputs)[0]
 
 值得注意的是该repo中对OU过程的实现中$\sigma$逐步递减的设计可以参考，其目的在于逐步降低Exploration的概率。  
 
+<a id="%E5%B0%8F%E7%BB%93"></a>
 ### 小结
 
 以上的实现方法中, 涉及Tensorflow, Keras, PyTorch三种主流的机器学习框架, 对actor network更新部分的核心思路均一致: actor network的loss函数为$-Q$, 通过**自动梯度运算**给出loss函数对actor network的参数$\theta^{\mu}$的梯度, 并通过`update`/`step`/`function`执行相应的梯度运算, 实现网络参数的更新。相比较而言, PyTorch的代码最为简洁直观, 对Tensorflow有了初步了解后也能直观地理解其操作的逻辑, 相比之下封装最为彻底的Keras理解起来就有些费劲了。
 
 
+<a id="%E5%85%B6%E4%BB%96%E5%8F%AF%E8%83%BD%E5%BD%B1%E5%93%8Dddpg%E6%95%88%E6%9E%9C%E7%9A%84%E5%9B%A0%E7%B4%A0"></a>
 ## 其他可能影响DDPG效果的因素
 
+<a id="noise-%E6%B7%BB%E5%8A%A0%E6%96%B9%E5%BC%8F"></a>
 ### Noise 添加方式
 
 在[Better Exploration with Parameter Noise](https://openai.com/blog/better-exploration-with-parameter-noise/)中提出了一种新的noise添加方式, 有待进一步研究。
 
+<a id="nomalization"></a>
 ### Nomalization
 
 DDPG原始论文中提到了需要为网络结构中增加normalization layer, 其原因是消除不同参数范围对结果的影响。而normalization layer的添加方式（放在哪？）存在经验模式。
 
+<a id="%E5%8F%82%E8%80%83"></a>
 ## 参考
 
 1. [Computing the Actor Gradient Update in the Deep Deterministic Policy Gradient (DDPG) algorithm](https://stats.stackexchange.com/questions/258472/computing-the-actor-gradient-update-in-the-deep-deterministic-policy-gradient-d)
